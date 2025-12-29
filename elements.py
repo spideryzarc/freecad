@@ -6,12 +6,21 @@ from enum import Enum, auto
 
 
 class Orientation(Enum):
-    FACE = auto()    # você está de frente para o objeto
-    LATERAL = auto()  # você está de frente para o objeto então o gira como uma porta
-    TOPO = auto()    # você está de frente para o objeto então o tomba como um dominó
+    FRONT = auto()   # você está de frente para o objeto
+    SIDE = auto()    # você está de frente para o objeto então o gira como uma porta (Lateral)
+    TOP = auto()     # você está de frente para o objeto então o tomba como um dominó (Topo)
 
 
 VARSET_NAME = "params"
+
+
+def header_var(name):
+    """Retorna um símbolo do sympy referenciando uma propriedade do VarSet (wrapper legado para 'var')."""
+    return sympy.Symbol(f"{VARSET_NAME}.{name}")
+
+# Mantendo alias 'var' se o usuário gostar, mas pelo plano mudamos nomes.
+# O plano dizia: "Renomear função var para get_var (opcional... Decidi manter var)".
+# Então vou manter `var`.
 
 
 def var(name):
@@ -33,16 +42,18 @@ def _set_prop_or_expr(obj, prop_name, value):
             obj.setExpression(prop_name, str(value))
 
 
-def create_painel(doc, width, height, thickness, orientation: Orientation = Orientation.FACE, position=(0, 0, 0), name="Panel"):
+def create_panel(doc, width, height, thickness, orientation: Orientation = Orientation.FRONT, position=(0, 0, 0), name="Panel"):
     """
     Cria um objeto Painel (Box) no FreeCAD.
 
-    :param width: Largura (float, string ou sympy).
-    :param height: Altura (float, string ou sympy).
-    :param thickness: Espessura (float, string ou sympy).
-    :param orientation: Enum Orientation (FACE, LATERAL, TOPO).
-    :param position: Tupla (x, y, z).
-    :param name: Nome do objeto.
+    Args:
+        doc: Documento FreeCAD.
+        width: Largura (float, string ou sympy).
+        height: Altura (float, string ou sympy).
+        thickness: Espessura (float, string ou sympy).
+        orientation: Enum Orientation (FRONT, SIDE, TOP).
+        position: Tupla (x, y, z).
+        name: Nome do objeto.
     """
     obj = doc.addObject("Part::Box", name)
 
@@ -76,11 +87,11 @@ def create_painel(doc, width, height, thickness, orientation: Orientation = Orie
     rotation = FreeCAD.Rotation()  # Rotação identidade
 
     # Aplicar Rotação baseada na Orientação
-    if orientation == Orientation.FACE:
+    if orientation == Orientation.FRONT:
         pass
-    elif orientation == Orientation.LATERAL:
+    elif orientation == Orientation.SIDE:
         rotation = FreeCAD.Rotation(FreeCAD.Vector(0, 0, 1), 90)
-    elif orientation == Orientation.TOPO:
+    elif orientation == Orientation.TOP:
         rotation = FreeCAD.Rotation(FreeCAD.Vector(1, 0, 0), -90)
 
     # Definir Placement base (valores numéricos)
@@ -101,8 +112,9 @@ def create_varset(doc, **kwargs):
     """
     Cria o objeto VarSet padrão ('Parametros') no documento.
 
-    :param doc: Documento FreeCAD.
-    :param kwargs: Variáveis a serem adicionadas (ex: Largura=100.0).
+    Args:
+        doc: Documento FreeCAD.
+        kwargs: Variáveis a serem adicionadas (ex: Width=100.0).
     """
     obj = doc.addObject("App::VarSet", VARSET_NAME)
     for key, value in kwargs.items():
@@ -115,7 +127,7 @@ def create_varset(doc, **kwargs):
 # --- Bloco de Teste ---
 if __name__ == "__main__" or __name__ == "elements":
     # Criar documento
-    doc_name = "TestePaineis"
+    doc_name = "TestPanels"
     if FreeCAD.activeDocument() and FreeCAD.activeDocument().Name == doc_name:
         FreeCAD.closeDocument(doc_name)
     doc = FreeCAD.newDocument(doc_name)
@@ -126,53 +138,53 @@ if __name__ == "__main__" or __name__ == "elements":
     T = 15.0  # Espessura
 
     # 0. Criar VarSet primeiro (para as fórmulas funcionarem)
-    create_varset(doc, Largura=W, Altura=H, Espessura=T)
+    create_varset(doc, Width=W, Height=H, Thickness=T)
 
     # 1. Painel de Frente (Parede de Fundo) - Usando referências ao VarSet
     # Nota: Usamos f"{VARSET_NAME}.NomeProp"
-    create_painel(doc,
-                  width=f"{VARSET_NAME}.Largura",
-                  height=f"{VARSET_NAME}.Altura",
-                  thickness=f"{VARSET_NAME}.Espessura",
-                  orientation=Orientation.FACE,
-                  position=(0, 0, 0), name="PainelFrente_Parametrico")
+    create_panel(doc,
+                 width=f"{VARSET_NAME}.Width",
+                 height=f"{VARSET_NAME}.Height",
+                 thickness=f"{VARSET_NAME}.Thickness",
+                 orientation=Orientation.FRONT,
+                 position=(0, 0, 0), name="PanelFront_Parametric")
 
     # 2. Painel Lateral (Parede Lateral) - Usando fórmula na posição
     # Position x = -Espessura
-    create_painel(doc,
-                  width=f"{VARSET_NAME}.Largura",
-                  height=f"{VARSET_NAME}.Altura",
-                  thickness=f"{VARSET_NAME}.Espessura",
-                  orientation=Orientation.LATERAL,
-                  position=(f"-{VARSET_NAME}.Espessura", 0, 0),
-                  name="PainelLateral_Parametrico")
+    create_panel(doc,
+                 width=f"{VARSET_NAME}.Width",
+                 height=f"{VARSET_NAME}.Height",
+                 thickness=f"{VARSET_NAME}.Thickness",
+                 orientation=Orientation.SIDE,
+                 position=(f"-{VARSET_NAME}.Thickness", 0, 0),
+                 name="PanelSide_Parametric")
 
     # 3. Painel de Topo
-    create_painel(doc,
-                  width=f"{VARSET_NAME}.Largura",
-                  height=f"{VARSET_NAME}.Altura",
-                  thickness=f"{VARSET_NAME}.Espessura",
-                  orientation=Orientation.TOPO,
-                  position=(0, 0, f"{VARSET_NAME}.Altura"),
-                  name="PainelTopo_Parametrico")
+    create_panel(doc,
+                 width=f"{VARSET_NAME}.Width",
+                 height=f"{VARSET_NAME}.Height",
+                 thickness=f"{VARSET_NAME}.Thickness",
+                 orientation=Orientation.TOP,
+                 position=(0, 0, f"{VARSET_NAME}.Height"),
+                 name="PanelTop_Parametric")
 
     # 4. Painel Flutuante (Todas as posições por fórmula)
     # Ex: x = Largura, y = Espessura, z = Altura/2
-    create_painel(doc,
-                  width=f"{VARSET_NAME}.Largura",
-                  height="500",
-                  thickness=T,
-                  orientation=Orientation.FACE,
-                  position=(f"{VARSET_NAME}.Largura",
-                            f"{VARSET_NAME}.Espessura", f"{VARSET_NAME}.Altura / 2"),
-                  name="PainelFlutuante_FullExpr")
+    create_panel(doc,
+                 width=f"{VARSET_NAME}.Width",
+                 height="500",
+                 thickness=T,
+                 orientation=Orientation.FRONT,
+                 position=(f"{VARSET_NAME}.Width",
+                           f"{VARSET_NAME}.Thickness", f"{VARSET_NAME}.Height / 2"),
+                 name="PanelFloating_FullExpr")
 
     # Finalização
     doc.recompute()
 
     output_dir = "output"
     os.makedirs(output_dir, exist_ok=True)
-    filename = os.path.join(output_dir, "paineis_parametricos.FCStd")
+    filename = os.path.join(output_dir, "parametric_panels.FCStd")
     doc.saveAs(filename)
 
     print(f"Arquivo gerado com sucesso: {filename}")
