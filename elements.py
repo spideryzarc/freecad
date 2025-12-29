@@ -6,9 +6,12 @@ from enum import Enum, auto
 
 
 class Orientation(Enum):
-    FRONT = auto()   # você está de frente para o objeto
-    SIDE = auto()    # você está de frente para o objeto então o gira como uma porta (Lateral)
-    TOP = auto()     # você está de frente para o objeto então o tomba como um dominó (Topo)
+    # Vertical | Plano XZ | Ex: Fundos, Portas, Painéis Frontais.
+    FRONT = auto()
+    # Vertical | Plano YZ | Ex: Laterais de móveis, Divisórias.
+    SIDE = auto()
+    # Horizontal | Plano XY | Ex: Prateleiras, Base, Topo, Tampos.
+    TOP = auto()
 
 
 VARSET_NAME = "params"
