@@ -1,3 +1,4 @@
+import sympy
 import FreeCAD
 import Part
 import os
@@ -13,23 +14,34 @@ class Orientation(Enum):
 VARSET_NAME = "params"
 
 
+def var(name):
+    """Retorna um símbolo do sympy referenciando uma propriedade do VarSet."""
+    return sympy.Symbol(f"{VARSET_NAME}.{name}")
+
+
 def _set_prop_or_expr(obj, prop_name, value):
     """Auxiliar para definir valor ou expressão em uma propriedade."""
-    if isinstance(value, str):
-        obj.setExpression(prop_name, value)
+    # Se for string ou sympy object, converte para string e define como expressão
+    if isinstance(value, (str, sympy.Basic)):
+        obj.setExpression(prop_name, str(value))
     else:
-        setattr(obj, prop_name, value)
+        # Tenta definir diretamente checkando se é float/int
+        try:
+            setattr(obj, prop_name, value)
+        except Exception:
+            # Fallback para string se for outro tipo
+            obj.setExpression(prop_name, str(value))
 
 
 def create_painel(doc, width, height, thickness, orientation: Orientation = Orientation.FACE, position=(0, 0, 0), name="Panel"):
     """
     Cria um objeto Painel (Box) no FreeCAD.
 
-    :param width: Largura (float ou string/fórmula).
-    :param height: Altura (float ou string/fórmula).
-    :param thickness: Espessura (float ou string/fórmula).
+    :param width: Largura (float, string ou sympy).
+    :param height: Altura (float, string ou sympy).
+    :param thickness: Espessura (float, string ou sympy).
     :param orientation: Enum Orientation (FACE, LATERAL, TOPO).
-    :param position: Tupla (x, y, z). Cada componente pode ser float ou string (fórmula).
+    :param position: Tupla (x, y, z).
     :param name: Nome do objeto.
     """
     obj = doc.addObject("Part::Box", name)
@@ -40,30 +52,25 @@ def create_painel(doc, width, height, thickness, orientation: Orientation = Orie
     _set_prop_or_expr(obj, "Height", height)
 
     # Tratamento da Posição (Placement)
-    # Precisamos separar valores numéricos para o construtor do Vector
-    # e strings para expressões posteriores.
-    x_val, y_val, z_val = 0.0, 0.0, 0.0
-    x_expr, y_expr, z_expr = None, None, None
+    # Separamos X, Y, Z. Se for numérico puro, vai pro Vector. Se for expr, setExpression.
 
     x_in, y_in, z_in = position
 
-    # X
-    if isinstance(x_in, str):
-        x_expr = x_in
-    else:
-        x_val = x_in
+    # Defaults numéricos para o Placement base
+    x_val, y_val, z_val = 0.0, 0.0, 0.0
 
-    # Y
-    if isinstance(y_in, str):
-        y_expr = y_in
-    else:
-        y_val = y_in
+    # Flags para saber se definimos expressão
+    x_expr, y_expr, z_expr = None, None, None
 
-    # Z
-    if isinstance(z_in, str):
-        z_expr = z_in
-    else:
-        z_val = z_in
+    # Função auxiliar local para resolver valor/expressão
+    def resolve(val):
+        if isinstance(val, (str, sympy.Basic)):
+            return 0.0, str(val)  # valor numérico dummy, expressão real
+        return float(val), None
+
+    x_val, x_expr = resolve(x_in)
+    y_val, y_expr = resolve(y_in)
+    z_val, z_expr = resolve(z_in)
 
     base_vector = FreeCAD.Vector(x_val, y_val, z_val)
     rotation = FreeCAD.Rotation()  # Rotação identidade
@@ -80,7 +87,6 @@ def create_painel(doc, width, height, thickness, orientation: Orientation = Orie
     obj.Placement = FreeCAD.Placement(base_vector, rotation)
 
     # Aplicar expressões de posição se houver
-    # Nota: Placement.Base.x funciona para definir expressão na coordenada X do Placement
     if x_expr:
         obj.setExpression("Placement.Base.x", x_expr)
     if y_expr:
