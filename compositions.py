@@ -11,6 +11,79 @@ else:
     sys.path.append(os.getcwd())
 
 
+def create_socalo(doc, h, w, d, t):
+    """
+    Cria um soco/rodapé (base recuada) parametrizado.
+    Semelhante a um nicho rotacionado (aberto em cima e em baixo).
+
+    Topologia (Sanduíche Horizontal):
+    - Frontal e Traseira são dominantes (Largura Total W).
+    - Laterais são ensanduichadas entre a Frontal e Traseira (Profundidade reduzida).
+
+    Diagrama Esquemático (Planif. Topo):
+      ________________________  <-- PainelTras (Y = D-T)
+     |                        |
+     |   ||              ||   |
+     |   ||              ||   | <-- PainelLateral (Entre Frente e Tras)
+     |___||______________||___|
+      ________________________  <-- PainelFrente (Y = 0)
+
+    :param doc: Documento FreeCAD.
+    :param h: Altura do soco.
+    :param w: Largura total.
+    :param d: Profundidade total.
+    :param t: Espessura dos painéis.
+    """
+    # 1. Configuração de Variáveis Paramétricas
+    create_varset(doc, Altura=h, Largura=w, Profundidade=d, Espessura=t)
+
+    H = f"{VARSET_NAME}.Altura"
+    W = f"{VARSET_NAME}.Largura"
+    D = f"{VARSET_NAME}.Profundidade"
+    T = f"{VARSET_NAME}.Espessura"
+
+    # 2. Dimensões Derivadas
+    # Profundidade interna das laterais = Profundidade - EspessuraFrente - EspessuraTras
+    d_inner = f"{D} - 2 * {T}"
+
+    # 3. Criação dos Painéis
+
+    # --- Frontal e Traseira ---
+    # Orientação FACE: Mantém X=Width, Y=Thickness, Z=Height.
+
+    # Frontal (na origem Y=0)
+    create_painel(doc, name="SocoFrente",
+                  width=W, height=H, thickness=T,
+                  orientation=Orientation.FACE,
+                  position=(0, 0, 0))
+
+    # Traseira (recuada em Y)
+    create_painel(doc, name="SocoTras",
+                  width=W, height=H, thickness=T,
+                  orientation=Orientation.FACE,
+                  position=(0, f"{D} - {T}", 0))
+
+    # --- Laterais ---
+    # Orientação LATERAL: Rotação +90 Z.
+    # Dimensões nominais: height=Altura, width=ProfundidadeInner.
+    # Rotação: Length(width) vai para Y, Thickness vai para -X.
+
+    # Lateral Esquerda
+    # Posição X=T (para ocupar de T até 0 no eixo X)
+    # Posição Y=T (para começar após a frente)
+    create_painel(doc, name="SocoEsq",
+                  width=d_inner, height=H, thickness=T,
+                  orientation=Orientation.LATERAL,
+                  position=(T, T, 0))
+
+    # Lateral Direita
+    # Posição X=W (para ocupar de W até W-T no eixo X)
+    create_painel(doc, name="SocoDir",
+                  width=d_inner, height=H, thickness=T,
+                  orientation=Orientation.LATERAL,
+                  position=(W, T, 0))
+
+
 def create_nincho(doc, h, w, d, t):
     """
     Cria um nicho parametrizado composto por 4 painéis (Base, Topo e duas Laterais).
@@ -104,14 +177,17 @@ if __name__ in ["__main__", "compositions"]:
     DEPTH = 300.0
     THICKNESS = 15.0
 
-    create_nincho(doc, h=HEIGHT, w=WIDTH, d=DEPTH, t=THICKNESS)
+    # --- Teste Soco ---
+    print("Testando Soco...")
+    SOCO_HEIGHT = 150.0
+    create_socalo(doc, h=SOCO_HEIGHT, w=WIDTH, d=DEPTH, t=THICKNESS)
 
     doc.recompute()
 
     # Salvar e reportar
     output_dir = "output"
     os.makedirs(output_dir, exist_ok=True)
-    filename = os.path.join(output_dir, "nincho_parametrico.FCStd")
+    filename = os.path.join(output_dir, "socolo_parametrico.FCStd")
     doc.saveAs(filename)
 
     print(f"Gerado com sucesso: {filename}")
